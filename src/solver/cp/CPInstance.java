@@ -117,11 +117,11 @@ public class CPInstance
       cp.setParameter(IloCP.IntParam.Workers, 1);
       cp.setParameter(IloCP.DoubleParam.TimeLimit, 300);
       // cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst);
-      IloIntVar S = cp.intVar(1, 9);
-      IloIntVar E = cp.intVar(0, 9);
-      IloIntExpr SEND = cp.sum(cp.prod(1000, S), cp.sum(cp.prod(100, E), cp.sum(cp.prod(10, N), D)));
-      IloIntExpr MORE   = cp.sum(cp.prod(1000, M), cp.sum(cp.prod(100, O), cp.sum(cp.prod(10,R), E)));
-      IloIntExpr[] clique1 = new IloIntExpr[3];
+      // IloIntVar S = cp.intVar(1, 9);
+      // IloIntVar E = cp.intVar(0, 9);
+      // IloIntExpr SEND = cp.sum(cp.prod(1000, S), cp.sum(cp.prod(100, E), cp.sum(cp.prod(10, N), D)));
+      // IloIntExpr MORE   = cp.sum(cp.prod(1000, M), cp.sum(cp.prod(100, O), cp.sum(cp.prod(10,R), E)));
+      // IloIntExpr[] clique1 = new IloIntExpr[3];
 
       IloIntVar[][] shifts_array = new IloIntVar[numEmployees][numDays];
       for (int i = 0; i < numEmployees; i++) {
@@ -130,76 +130,175 @@ public class CPInstance
         }
       }
 
+      IloIntVar[][] night_shifts_array = new IloIntVar[numEmployees][numDays];
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          night_shifts_array[i][j] = cp.intVar(0,1);
+        }
+      }
+      for (int i = 0; i < numEmployees; i++) {
+        IloLinearNumExpr totalNightShifts = cp.linearNumExpr();
+        for (int j = 0; j < numDays; j++) {
+          totalNightShifts.addTerm(1,night_shifts_array[i][j]);
+          cp.add(cp.imply(cp.eq(shifts_array[i][j], 1), cp.eq(night_shifts_array[i][j], 1)));
+        }
+        cp.add(cp.le(totalNightShifts, maxTotalNightShift));
+      }
+
+      for (int j = 0; j < numDays; j++) {
+        IloLinearNumExpr totalNightsToday = cp.linearNumExpr();
+        for (int i = 0; i < numEmployees; i++) {
+
+          totalNightsToday.addTerm(1, night_shifts_array[i][j]);
+        }
+        cp.add(cp.ge(totalNightsToday, minDemandDayShift[j][1]));
+      }
+
+
+
+      IloIntVar[][] day_shifts_array = new IloIntVar[numEmployees][numDays];
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          day_shifts_array[i][j] = cp.intVar(0,1);
+        }
+      }
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          cp.add(cp.imply(cp.eq(shifts_array[i][j], 2), cp.eq(day_shifts_array[i][j], 1)));
+        }
+      }
+      for (int j = 0; j < numDays; j++) {
+        IloLinearNumExpr totalDaysToday = cp.linearNumExpr();
+        for (int i = 0; i < numEmployees; i++) {
+          totalDaysToday.addTerm(1, day_shifts_array[i][j]);
+        }
+        cp.add(cp.ge(totalDaysToday, minDemandDayShift[j][2]));
+      }
+
+      IloIntVar[][] evening_shifts_array = new IloIntVar[numEmployees][numDays];
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          evening_shifts_array[i][j] = cp.intVar(0,1);
+        }
+      }
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          cp.add(cp.imply(cp.eq(shifts_array[i][j], 3), cp.eq(evening_shifts_array[i][j], 1)));
+        }
+      }
+      for (int j = 0; j < numDays; j++) {
+        IloLinearNumExpr totalEveningsToday = cp.linearNumExpr();
+        for (int i = 0; i < numEmployees; i++) {
+          totalEveningsToday.addTerm(1, evening_shifts_array[i][j]);
+        }
+        cp.add(cp.ge(totalEveningsToday, minDemandDayShift[j][3]));
+      }
+
+      IloIntVar[][] off_shifts_array = new IloIntVar[numEmployees][numDays];
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          off_shifts_array[i][j] = cp.intVar(0,1);
+        }
+      }
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < numDays; j++) {
+          cp.add(cp.imply(cp.eq(shifts_array[i][j], 0), cp.eq(off_shifts_array[i][j], 1)));
+        }
+      }
+      for (int j = 0; j < numDays; j++) {
+        IloLinearNumExpr totalOffsToday = cp.linearNumExpr();
+        for (int i = 0; i < numEmployees; i++) {
+          totalOffsToday.addTerm(1, off_shifts_array[i][j]);
+        }
+        cp.add(cp.ge(totalOffsToday, minDemandDayShift[j][0]));
+      }
+
       for (int i = 0; i < numEmployees; i++) {
         // First four days all different
-        IloIntExpr totalNightShifts = cp.sum(0,0);
+        //IloIntVar tmp = cp.intVar(0,0);
+        //IloIntExpr totalNightShifts = cp.sum(tmp,tmp);
+        //IloLinearNumExpr totalNightShifts = cp.linearNumExpr();
         IloIntVar[] firstFourDays = {shifts_array[i][0], shifts_array[i][1], shifts_array[i][2], shifts_array[i][3]};
         cp.add(cp.allDiff(firstFourDays));
 
         for (int j = 0; j < numDays; j++) {
           if (j+1 < numDays) {
             // Constraint that no two days in a row can be night shifts
-            cp.add(cp.imply(cp.eq(shifts_array[i][j], 1), cp.neq(shifts_array[i][j+1], 1));
-            if (shifts_array[i][j] == 1) {
-              totalNightShifts = cp.sum(totalNightShifts, 1);
-            }
+            cp.add(cp.imply(cp.eq(shifts_array[i][j], 1), cp.neq(shifts_array[i][j+1], 1)));
+            // if (shifts_array[i][j] == 1) {
+            //   totalNightShifts.addTerm(1,shifts_array[i][j]);//cp.sum(totalNightShifts, 1);
+            // }
           }
         }
-        cp.add(cp.le(totalNightShifts, maxTotalNightShift));
+        // cp.add(cp.le(totalNightShifts, maxTotalNightShift));
 
       }
 
+      IloLinearIntExpr[][] workSum_array = new IloLinearIntExpr[numEmployees][numWeeks];
+
+      IloIntVar[][][] times_array = new IloIntVar[numEmployees][numDays][2];
+      for (int i = 0; i < numEmployees; i++) {
+
+        for (int j = 0; j < numDays; j++) {
+          // SOMETHING WITH -1
+          times_array[i][j][0] = cp.intVar(-1,20);
+          times_array[i][j][1] = cp.intVar(-1,24);
+
+        }
+      }
+      System.out.println("MAX WEEKLY WORK " + maxWeeklyWork);
+      System.out.println("MIN WEEKLY WORK " + minWeeklyWork);
+      for (int i = 0; i < numEmployees; i++) {
+        for(int week = 0; week < numWeeks; week++){
+          workSum_array[i][week] = cp.linearIntExpr();
+          // IloLinearIntExpr totalHours = cp.linearIntExpr();
+
+          for (int j = 0; j < 7; j++) {
+
+            cp.add(cp.le(cp.diff(times_array[i][7*week+j][1], times_array[i][7*week+j][0]), maxDailyWork));
+            // Only if this is not an off shift does this constaint apply
+            cp.add(cp.imply(cp.neq(shifts_array[i][7*week+j], 0), cp.ge(cp.diff(times_array[i][7*week+j][1], times_array[i][7*week+j][0]), minConsecutiveWork)));
+
+            workSum_array[i][week].addTerm(1, times_array[i][7*week+j][1]);
+            workSum_array[i][week].addTerm(-1, times_array[i][7*week+j][0]);
+
+
+            //totalHours.addTerm(1, times_array[i][j][1]);
+            //totalHours.addTerm(-1, times_array[i][j][0]);
+
+            //workSum.addTerm(1, cp.diff(times_array[i][j][1], times_array[i][j][0]));
+            //totalHours.addTerm(1, cp.diff(times_array[i][j][1], times_array[i][j][0]));
+
+        }
+        cp.add(cp.le(workSum_array[i][week], maxWeeklyWork));
+        cp.add(cp.ge(workSum_array[i][week], minWeeklyWork));
+        //cp.add(cp.ge(totalHours, minDailyOperation));
+      }
+    }
+
+    for(int j = 0; j < numDays; j ++){
+      IloLinearIntExpr totalHours = cp.linearIntExpr();
+      for(int i = 0; i < numEmployees; i++){
+        totalHours.addTerm(1, times_array[i][j][1]);
+        totalHours.addTerm(-1, times_array[i][j][0]);
+      }
+      cp.add(cp.ge(totalHours, minDailyOperation));
+    }
+
+    // ATTEMPTING TO HANDLE THE -1
+    for (int i = 0; i < numEmployees; i++) {
       for (int j = 0; j < numDays; j++) {
-        IloIntExpr totalDay = cp.sum(0,0);
-        IloIntExpr totalNight = cp.sum(0,0);
-        IloIntExpr totalEvening = cp.sum(0,0);
-        IloIntExpr totalOff = cp.sum(0,0);
-        for (int i = 0; i < numEmployees; i++) {
-            IloIntVar curr = shift[i][j];
-            if (curr == 0) {
-              // Off
-              totalOff = cp.sum(totalOff, 1);
-            } else if (curr == 1) {
-              totalNight = cp.sum(totalNight, 1);
-            } else if (curr == 2) {
-              totalDay = cp.sum(totalDay, 1);
-            } else if (curr == 3) {
-              totalEvening = cp.sum(totalEvening, 1);
-            } else {
-              System.out.println("OH FUCK");
-            }
-        }
-        cp.add(cp.ge(totalDay, minDemandDayShift[j][2]));
-        cp.add(cp.ge(totalNight, minDemandDayShift[j][1]));
-        cp.add(cp.ge(totalEvening, minDemandDayShift[j][3]));
-        cp.add(cp.ge(totalOff, minDemandDayShift[j][0]));
+        cp.add(cp.imply( cp.eq(times_array[i][j][0], -1), cp.eq(shifts_array[i][j],0)));
+        cp.add(cp.imply(cp.eq(times_array[i][j][1], -1), cp.eq(shifts_array[i][j],0)));
+        // Constraint that if start is -1 end has to be -1 and vice versa
+        // Problem is that this violates minConsecutiveWork constraint
+        cp.add(cp.imply(cp.eq(times_array[i][j][1], -1), cp.eq(times_array[i][j][0], -1)));
+        cp.add(cp.imply(cp.eq(times_array[i][j][0], -1), cp.eq(times_array[i][j][1], -1)));
+
+        cp.add(cp.imply(cp.eq(shifts_array[i][j], 0), cp.eq(times_array[i][j][0], -1)));
+        cp.add(cp.imply(cp.eq(shifts_array[i][j], 0), cp.eq(times_array[i][j][1],-1)));
       }
-
-      IloIntVar[][] times_array = new IloIntVar[numEmployees][numDays];
-      for (int i = 0; i < numEmployees; i++) {
-
-        for (int j = 0; j < numDays; j++) {
-          times_array[i][j] = {cp.intVar(0,20), cp.intVar(4,24)};
-
-        }
-      }
-
-      for (int i = 0; i < numEmployees; i++) {
-        IloIntExpr workSum = cp.sum(0,0);
-        IloIntExpr totalHours = cp.sum(0,0);
-        for (int j = 0; j < numDays; j++) {
-          cp.add(cp.ge(cp.diff(times_array[i][j][1], times_array[i][j][0]), minConsecutiveWork));
-          cp.add(cp.le(cp.diff(times_array[i][j][1], times_array[i][j][0]), maxDailyWork));
-          workSum = cp.sum(workSum, cp.diff(times_array[i][j][1], times_array[i][j][0]));
-          totalHours = cp.sum(totalHours, cp.diff(times_array[i][j][1], times_array[i][j][0]));
-
-        }
-        cp.add(cp.le(workSum, maxWeeklyWork));
-        cp.add(cp.ge(workSum, minWeeklyWork));
-        cp.add(cp.ge(totalHours, minDailyOperation));
-      }
-
-
+    }
 
       // Uncomment this: to set the solver output level if you wish
       // cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
@@ -207,6 +306,20 @@ public class CPInstance
       {
         cp.printInformation();
 
+        //String out = "";
+        for(int i = 0; i < numEmployees; i++){
+          String out = "";
+          for(int j = 0; j < numDays; j++){
+            out += cp.getValue(times_array[i][j][0]);
+            out += " ";
+            out += cp.getValue(times_array[i][j][1]);
+            out += " ";
+          }
+          System.out.println(out);
+          System.out.println("");
+        }
+        //System.out.println(out);
+        //System.out.println("WORK SUM " + cp.getValue(workSum_array[0]));
         // Uncomment this: for poor man's Gantt Chart to display schedules
         // prettyPrint(numEmployees, numDays, beginED, endED);
       }
