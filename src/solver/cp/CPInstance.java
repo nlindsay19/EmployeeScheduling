@@ -117,7 +117,7 @@ public class CPInstance
       // Important: Do not change! Keep these parameters as is
       cp.setParameter(IloCP.IntParam.Workers, 1);
       cp.setParameter(IloCP.DoubleParam.TimeLimit, 300);
-      // cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst);
+      cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst);
 
       IloIntVar[][] shifts_array = new IloIntVar[numEmployees][numDays];
 
@@ -129,6 +129,10 @@ public class CPInstance
         }
         // Contraint that employee can only work so many night shifts
         cp.add(cp.le(cp.count(countingNightShifts, 1), maxTotalNightShift));
+
+        if (i > 0) {
+          cp.add(cp.lexicographic(shifts_array[i], shifts_array[i-1]));
+        }
       }
 
       for (int j = 0; j < numDays; j++) {
@@ -191,7 +195,52 @@ public class CPInstance
 
       // Uncomment this: to set the solver output level if you wish
       // cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
-      if(cp.solve())
+
+      IloVarSelector[] varSelector = new IloVarSelector[3];
+      varSelector[0] = cp.selectSmallest(cp.domainSize());
+      varSelector[1] = cp.selectLargest(cp.varImpact());
+      varSelector[2] = cp.selectRandomVar();
+
+      IloValueSelector valueSelector = cp.selectLargest(cp.value());
+
+      IloIntVar[] flatData = new IloIntVar[2*4*numEmployees];
+      int index = 0;
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 0; j < 4; j++) {
+          flatData[index++] = shifts_array[i][j];
+          flatData[index++] = duration_array[i][j];
+        }
+      }
+
+      IloSearchPhase firstPhase = cp.searchPhase(flatData, cp.intVarChooser(varSelector), cp.intValueChooser(valueSelector));
+
+      IloIntVar[] flatNextData = new IloIntVar[2*3*numEmployees];
+      int index = 0;
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 4; j < 3; j++) {
+          flatNextData[index++] = shifts_array[i][j];
+          flatNextData[index++] = duration_array[i][j];
+        }
+      }
+
+      IloSearchPhase nextPhase = cp.searchPhase(flatNextData, cp.intVarChooser(varSelector), cp.intValueChooser(valueSelector));
+
+      IloIntVar[] flatSecondData = new IloIntVar[2*(numDays-7)*numEmployees];
+      index = 0;
+      for (int i = 0; i < numEmployees; i++) {
+        for (int j = 7; j < numDays; j++) {
+          flatSecondData[index++] = shifts_array[i][j];
+          flatSecondData[index++] = duration_array[i][j];
+        }
+      }
+
+      IloSearchPhase secondPhase = cp.searchPhase(flatSecondData, cp.intVarChooser(varSelector), cp.intValueChooser(valueSelector));
+
+
+      IloSearchPhase[] phasesList = new IloSearchPhase[]{firstPhase, nextPhase, secondPhase};
+
+
+      if(cp.solve(phasesList))
       {
         cp.printInformation();
 
